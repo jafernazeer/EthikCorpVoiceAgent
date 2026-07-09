@@ -4,6 +4,7 @@ import {
   Activity,
   BarChart3,
   Bell,
+  Bot,
   FileText,
   Gauge,
   Grid2X2,
@@ -142,10 +143,10 @@ function App() {
   const call = useVapiCall();
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell page-${activePage}`}>
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
       <div className="main-shell">
-        <Topbar activePage={activePage} />
+        <Topbar activePage={activePage} setActivePage={setActivePage} openCall={() => setCallPanelOpen(true)} />
         <main className="page-canvas">
           {activePage === "overview" && <OverviewPage openCall={() => setCallPanelOpen(true)} />}
           {activePage === "conversations" && (
@@ -315,7 +316,8 @@ function Sidebar({ activePage, setActivePage }) {
   );
 }
 
-function Topbar({ activePage }) {
+function Topbar({ activePage, setActivePage, openCall }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const titles = {
     overview: ["Home Page", "Voice agent analytics at a glance"],
     conversations: ["Conversation", "Past calls and transcript review"],
@@ -323,11 +325,64 @@ function Topbar({ activePage }) {
     test: ["Test Call", "Live EC Calling Agent quality check"],
   };
   const [title, subtitle] = titles[activePage];
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [activePage]);
+
   return (
     <header className="topbar">
-      <div>
+      <div className="mobile-topbar-brand">
+        <button type="button" aria-label="Go to Home Page" onClick={() => setActivePage("overview")}>
+          <img src="/brand/ethikcorp-logo-blue.png" alt="EthikCorp" />
+        </button>
+      </div>
+      <div className="topbar-title">
         <h1>{title}</h1>
         <p>{subtitle}</p>
+      </div>
+      <div className="mobile-topbar-controls">
+        <button
+          type="button"
+          className="mobile-call-trigger"
+          aria-label="Open EC Calling Agent test widget"
+          onClick={() => {
+            setMenuOpen(false);
+            openCall();
+          }}
+        >
+          <PhoneCall size={20} />
+        </button>
+        <div className="mobile-menu-wrap">
+          <button
+            type="button"
+            className={menuOpen ? "mobile-menu-trigger open" : "mobile-menu-trigger"}
+            aria-label="Open dashboard menu"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-dashboard-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <Grid2X2 size={20} />
+          </button>
+          {menuOpen && (
+            <nav id="mobile-dashboard-menu" className="mobile-menu-panel" aria-label="Mobile dashboard sections">
+              {NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={activePage === item.id ? "active" : ""}
+                    onClick={() => setActivePage(item.id)}
+                  >
+                    <Icon size={18} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
+        </div>
       </div>
       <div className="topbar-actions">
         <label className="search-box">
@@ -346,6 +401,9 @@ function Topbar({ activePage }) {
 function OverviewPage() {
   return (
     <section className="dashboard-page">
+      <div className="mobile-overview-heading">
+        <h1>Voice agent Analytics</h1>
+      </div>
       <div className="report-row">
         <p>Reporting window <strong>July 2026</strong> · UAE time zone</p>
         <div className="period-toggle">
@@ -513,6 +571,8 @@ function ConversationsPage({ selectedConversation, setSelectedConversation }) {
 }
 
 function LeadsPage() {
+  const [selectedLead, setSelectedLead] = useState(leads[0]);
+
   return (
     <section className="leads-page">
       <div className="lead-toolbar">
@@ -525,6 +585,37 @@ function LeadsPage() {
         <span><strong>5</strong> Qualified</span>
         <span><strong>3</strong> Training</span>
         <span><strong>4</strong> Callback</span>
+      </div>
+      <div className="mobile-lead-workspace">
+        <div className="mobile-lead-list" aria-label="Captured leads">
+          {leads.map((lead) => (
+            <button
+              type="button"
+              className={selectedLead.phone === lead.phone ? "mobile-lead-row active" : "mobile-lead-row"}
+              key={lead.phone}
+              onClick={() => setSelectedLead(lead)}
+            >
+              <span>
+                <strong>{lead.name}</strong>
+                <small>{lead.phone}</small>
+                <em>{lead.status}</em>
+              </span>
+            </button>
+          ))}
+        </div>
+        <article className="mobile-lead-detail">
+          <header>
+            <strong>{selectedLead.name}</strong>
+            <span className={`lead-status ${selectedLead.status.toLowerCase()}`}>{selectedLead.status}</span>
+          </header>
+          <dl>
+            <div><dt>Place</dt><dd>{selectedLead.place}</dd></div>
+            <div><dt>Calling Number</dt><dd>{selectedLead.phone}</dd></div>
+            <div><dt>Email</dt><dd>{selectedLead.email}</dd></div>
+            <div><dt>Requirement</dt><dd>{selectedLead.requirement}</dd></div>
+            <div><dt>Score</dt><dd>{selectedLead.score}</dd></div>
+          </dl>
+        </article>
       </div>
       <div className="table-panel">
         <table>
@@ -568,7 +659,7 @@ function TestCallPage({ call }) {
       <article className="panel test-copy">
         <PanelTitle
           title="EC Calling Agent Test Console"
-          subtitle="This panel allows you to test the currently integrated EC Calling Agent. Click the Start Call button to initiate a live call with the configured agent. Your browser will request permission to access the microphone before the call begins."
+          subtitle="Click the Start Call button to initiate a live call. Your browser will request permission to access the microphone before the call begins."
         />
       </article>
       <PhoneMockup call={call} />
