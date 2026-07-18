@@ -5,6 +5,11 @@ import {
   BarChart3,
   Bell,
   Bot,
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
   FileText,
   Gauge,
   Grid2X2,
@@ -17,7 +22,6 @@ import {
   PhoneForwarded,
   PhoneMissed,
   PhoneOff,
-  Plus,
   Search,
   UserRound,
   UsersRound,
@@ -27,136 +31,540 @@ import {
 import "./styles.css";
 
 const NAV_ITEMS = [
-  { id: "overview", label: "Home Page", hint: "Voice analytics", icon: Grid2X2 },
-  { id: "conversations", label: "Conversation", hint: "Transcripts", icon: Headphones, count: 18 },
-  { id: "leads", label: "Lead Management", hint: "Captured clients", icon: UsersRound, count: 12 },
-  { id: "test", label: "Test Call", hint: "EC agent QA", icon: PhoneCall },
+  { id: "overview", label: "Dashboard", hint: "Voice analytics", icon: Grid2X2 },
+  { id: "conversations", label: "Conversation", hint: "Transcripts", icon: Headphones },
+  { id: "leads", label: "Lead Management", hint: "Captured clients", icon: UsersRound },
+  { id: "test", label: "Diagnostics", hint: "EC agent QA", icon: PhoneCall },
 ];
 
 const VAPI_PUBLIC_KEY = "ee1d4795-4453-4456-ba50-c42a3404e1c3";
 const VAPI_ASSISTANT_ID = "429bb390-be3c-4b1e-bc3a-2a717917725c";
+const CALL_HISTORY_KEY = "ethikcorp.ec.callHistory.v1";
+const MAX_CALL_RECORDS = 80;
+const MAX_VISIBLE_CALLS = 3;
+const DEMO_CALL_ID_PATTERN = /^c-10\d+$/;
+const WORKFLOW_STATUSES = ["Open", "Follow up required", "Closed"];
 
-const metrics = [
-  { label: "Current live calls", value: "4", delta: "2 voice, 2 web", icon: Activity, tone: "cyan" },
-  { label: "AI calls today", value: "186", delta: "+18.4% vs yesterday", icon: PhoneCall, tone: "blue" },
-  { label: "AI calls last week", value: "1,248", delta: "94% answered", icon: BarChart3, tone: "green" },
-  { label: "AI calls last month", value: "5,842", delta: "UAE wide traffic", icon: Gauge, tone: "blue" },
-  { label: "Dropped by AI agent", value: "11", delta: "0.18% system drop", icon: PhoneMissed, tone: "orange" },
-  { label: "Dropped by customer", value: "39", delta: "Mostly under 12 sec", icon: PhoneOff, tone: "red" },
-];
+function nowIso() {
+  return new Date().toISOString();
+}
 
-const conversations = [
-  {
-    id: "c-1001",
-    name: "Nadia Al Mansoori",
-    company: "Dubai Retail Group",
-    phone: "+971 50 128 4456",
-    time: "9 min ago",
-    status: "Lead qualified",
-    channel: "Voice",
-    summary: "Asked about retail transformation and omnichannel customer experience.",
-    transcript: [
-      ["AI Agent", "Thank you for calling EthikCorp. We help organizations across Dubai and the UAE with business transformation, corporate training, and engagement solutions. How may I help you today?"],
-      ["Customer", "We run a retail chain and need help improving our online and store customer experience."],
-      ["AI Agent", "EthikCorp supports retail and consumer businesses with digital commerce strategy, omnichannel customer journeys, supply chain visibility, data analytics, AI automation, and margin improvement. Is your priority growth, retention, or operational efficiency?"],
-      ["Customer", "Customer retention and digital conversion are the biggest priorities."],
-      ["AI Agent", "I can ask the transformation team to follow up. May I collect your name, company, email, and preferred callback time?"],
-    ],
-  },
-  {
-    id: "c-1002",
-    name: "Rashid Khan",
-    company: "Al Qusais Logistics",
-    phone: "+971 55 232 1180",
-    time: "22 min ago",
-    status: "Callback requested",
-    channel: "Voice",
-    summary: "Interested in process optimization and reducing workflow bottlenecks.",
-    transcript: [
-      ["AI Agent", "EthikCorp can help identify bottlenecks, redesign processes, and measure operational improvement."],
-      ["Customer", "We have delays in approvals and dispatch. I need someone to review the process."],
-      ["AI Agent", "That fits business process transformation. The team can start with a diagnostic and map the current workflow before recommending changes."],
-    ],
-  },
-  {
-    id: "c-1003",
-    name: "Aisha Rahman",
-    company: "Hospitality Group Abu Dhabi",
-    phone: "+971 52 892 9034",
-    time: "47 min ago",
-    status: "Consultation booked",
-    channel: "Voice",
-    summary: "Hospitality guest experience and revenue management inquiry.",
-    transcript: [
-      ["Customer", "Do you work with hotels?"],
-      ["AI Agent", "Yes. EthikCorp supports hospitality businesses with guest experience optimization, revenue management, operational excellence, AI automation, workforce transformation, and data analytics."],
-      ["Customer", "We need support with guest journey and staff efficiency."],
-      ["AI Agent", "I will capture that as hospitality transformation focused on guest journey and workforce efficiency."],
-    ],
-  },
-  {
-    id: "c-1004",
-    name: "Omar Farooq",
-    company: "Emirates Finance",
-    phone: "+971 56 340 7765",
-    time: "1h ago",
-    status: "Training inquiry",
-    channel: "Voice",
-    summary: "Asked for leadership development and team building for managers.",
-    transcript: [
-      ["AI Agent", "EthikCorp provides management training, leadership development, team building, sales training, customer service, soft skills, HR, and online corporate training programs."],
-      ["Customer", "We need leadership development for 40 branch managers."],
-      ["AI Agent", "EthikCorp can start with a Training Needs Analysis and customize the program around your UAE business context."],
-    ],
-  },
-  {
-    id: "c-1005",
-    name: "Meera Nair",
-    company: "Brand Activation Studio",
-    phone: "+971 58 911 7012",
-    time: "2h ago",
-    status: "Games Revolution",
-    channel: "Voice",
-    summary: "Needs gamified activation concept for an event.",
-    transcript: [
-      ["Customer", "We want a gamified customer engagement experience."],
-      ["AI Agent", "EthikCorp's Games Revolution division creates engagement experiences through gamification, AR/VR gaming, metaverse concepts, and cross-platform game development."],
-    ],
-  },
-];
+function useUaeClock() {
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-const leads = [
-  { name: "Nadia Al Mansoori", place: "Dubai", phone: "+971 50 128 4456", email: "nadia@dubairetail.example", requirement: "Retail transformation, omnichannel CX, customer retention", source: "Voice", score: 94, status: "Qualified" },
-  { name: "Rashid Khan", place: "Dubai", phone: "+971 55 232 1180", email: "rashid@alqlogistics.example", requirement: "Business process transformation and approval workflow review", source: "Voice", score: 86, status: "Callback" },
-  { name: "Aisha Rahman", place: "Abu Dhabi", phone: "+971 52 892 9034", email: "aisha@hospitalitygroup.example", requirement: "Hospitality guest experience and workforce efficiency", source: "Voice", score: 91, status: "Booked" },
-  { name: "Omar Farooq", place: "Dubai", phone: "+971 56 340 7765", email: "omar@emiratesfinance.example", requirement: "Leadership development for branch managers", source: "Voice", score: 82, status: "Training" },
-  { name: "Meera Nair", place: "Sharjah", phone: "+971 58 911 7012", email: "meera@activation.example", requirement: "Gamified brand activation and event engagement", source: "Voice", score: 76, status: "New" },
-  { name: "Hassan Al Kuwaiti", place: "Kuwait", phone: "+965 600 12990", email: "hassan@services.example", requirement: "Corporate transformation strategy and KPI reporting", source: "Voice", score: 88, status: "Qualified" },
-  { name: "Priya Sharma", place: "Dubai", phone: "+971 54 214 9081", email: "priya@emiratesfinance.example", requirement: "Customer service excellence training", source: "Voice", score: 79, status: "Warm" },
-  { name: "Dr. Amina Hassan", place: "Dubai", phone: "+971 50 890 1234", email: "amina@cityhospital.example", requirement: "Soft skills and communication training", source: "Voice", score: 84, status: "Qualified" },
-];
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return {
+    time: currentTime.toLocaleTimeString("en-AE", {
+      timeZone: "Asia/Dubai",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    date: currentTime.toLocaleDateString("en-AE", {
+      timeZone: "Asia/Dubai",
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }),
+  };
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+function sameLocalDay(iso, date = new Date()) {
+  const candidate = new Date(iso);
+  return candidate.getFullYear() === date.getFullYear()
+    && candidate.getMonth() === date.getMonth()
+    && candidate.getDate() === date.getDate();
+}
+
+function withinDays(iso, days) {
+  return Date.now() - new Date(iso).getTime() <= days * 24 * 60 * 60 * 1000;
+}
+
+function formatRelativeTime(iso) {
+  const diffMinutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (diffMinutes < 1) return "now";
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+  const hours = Math.round(diffMinutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+function formatTranscriptTime(iso, index) {
+  if (!iso) return `${index + 1} min`;
+  return new Date(iso).toLocaleTimeString("en-AE", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDisplayDate(iso) {
+  return new Date(iso).toLocaleDateString("en-AE", {
+    timeZone: "Asia/Dubai",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function toDateInputValue(iso) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function toLocalDateInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function getWorkflowStatus(record) {
+  return WORKFLOW_STATUSES.includes(record.workflowStatus) ? record.workflowStatus : "Open";
+}
+
+function workflowStatusClass(status) {
+  return status.toLowerCase().replace(/\s+/g, "-");
+}
+
+function withinDateFilter(iso, fromDate, toDate) {
+  const value = toDateInputValue(iso);
+  if (!value) return !fromDate && !toDate;
+  return (!fromDate || value >= fromDate) && (!toDate || value <= toDate);
+}
+
+function filterByDateRange(items, fromDate, toDate) {
+  return items.filter((item) => withinDateFilter(item.dateValue || item.startedAt, fromDate, toDate));
+}
+
+function sortByDate(items, direction) {
+  return [...items].sort((a, b) => {
+    const aTime = new Date(a.dateValue).getTime();
+    const bTime = new Date(b.dateValue).getTime();
+    const diff = (Number.isNaN(aTime) ? 0 : aTime) - (Number.isNaN(bTime) ? 0 : bTime);
+    return direction === "asc" ? diff : -diff;
+  });
+}
+
+function matchesQuery(values, query) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+  return values
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(normalizedQuery);
+}
+
+function loadCallRecords() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(CALL_HISTORY_KEY) || "[]");
+    if (!Array.isArray(stored)) return [];
+    return stored
+      .filter((record) => record?.source !== "Dashboard demo" && !DEMO_CALL_ID_PATTERN.test(record?.id || ""))
+      .slice(0, MAX_CALL_RECORDS);
+  } catch {
+    return [];
+  }
+}
+
+function normalizeTranscriptEntry(entry) {
+  if (Array.isArray(entry)) {
+    return { speaker: entry[0] || "Customer", text: entry[1] || "", at: entry[2] || nowIso(), final: true };
+  }
+  return {
+    speaker: entry?.speaker || "Customer",
+    text: entry?.text || "",
+    at: entry?.at || nowIso(),
+    final: entry?.final !== false,
+    partial: Boolean(entry?.partial),
+  };
+}
+
+function transcriptText(record) {
+  return (record.transcript || [])
+    .map(normalizeTranscriptEntry)
+    .map((entry) => entry.text)
+    .join(" ");
+}
+
+function firstCustomerRequirement(record) {
+  const customerLine = (record.transcript || [])
+    .map(normalizeTranscriptEntry)
+    .find((entry) => entry.speaker === "Customer" && entry.text.length > 18 && !/@/.test(entry.text));
+  return customerLine?.text || record.summary || "Live EC Calling Agent inquiry";
+}
+
+function cleanStatedName(value) {
+  if (!value) return "";
+  const cleaned = value
+    .replace(/\b(?:from|in|at|with|for|and|my email|email|phone|number|calling|i need|we need|looking for|regarding|about)\b.*$/i, "")
+    .replace(/[^a-zA-Z .'-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const words = cleaned.split(" ").filter(Boolean).slice(0, 4);
+  if (!words.length || words.some((word) => /^(from|email|phone|need|calling)$/i.test(word))) return "";
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(" ");
+}
+
+function extractCustomerName(record) {
+  const entries = (record.transcript || []).map(normalizeTranscriptEntry);
+  const customerEntries = entries.filter((entry) => entry.speaker === "Customer");
+  const promptIndex = entries.findIndex((entry) => (
+    entry.speaker === "AI Agent"
+    && /\b(name|who am i speaking with|may i know|can i have your name)\b/i.test(entry.text)
+  ));
+  const afterPrompt = promptIndex >= 0
+    ? entries.slice(promptIndex + 1).find((entry) => entry.speaker === "Customer")
+    : null;
+  const candidateLines = [afterPrompt, ...customerEntries].filter(Boolean);
+
+  for (const entry of candidateLines) {
+    const explicitMatch = entry.text.match(/\b(?:my name is|this is|i am|i'm|it's|its|name is|call me)\s+([a-zA-Z .'-]{2,80})/i);
+    const explicitName = cleanStatedName(explicitMatch?.[1]);
+    if (explicitName) return explicitName;
+
+    if (afterPrompt && entry === afterPrompt) {
+      const directName = cleanStatedName(entry.text);
+      if (directName) return directName;
+    }
+  }
+
+  return "";
+}
+
+function extractLeadDetails(record) {
+  const body = transcriptText(record);
+  const lowerBody = body.toLowerCase();
+  const email = body.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || record.lead?.email || "Not provided";
+  const phone = body.match(/(?:\+?\d[\d\s().-]{7,}\d)/)?.[0]?.replace(/\s+/g, " ") || record.phone || "Browser call";
+  const statedName = extractCustomerName(record);
+  const name = statedName || record.lead?.name || record.name || `Website Caller ${record.id.slice(-4).toUpperCase()}`;
+  const placeMatch = body.match(/\b(Dubai|Abu Dhabi|Sharjah|Ajman|Ras Al Khaimah|Fujairah|Umm Al Quwain|Kuwait|Saudi Arabia|Qatar|Oman|Bahrain)\b/i);
+  const place = record.lead?.place || (placeMatch ? placeMatch[1] : "UAE");
+  const requirement = record.lead?.requirement || firstCustomerRequirement(record);
+  const status = lowerBody.includes("training")
+    ? "Training"
+    : lowerBody.includes("callback") || lowerBody.includes("call back")
+      ? "Callback"
+      : lowerBody.includes("book") || lowerBody.includes("consultation") || lowerBody.includes("meeting")
+        ? "Booked"
+        : requirement.length > 20
+          ? "Qualified"
+          : "New";
+  const score = Math.min(98, 52
+    + (email !== "Not provided" ? 12 : 0)
+    + (phone !== "Browser call" ? 10 : 0)
+    + (name.startsWith("Website Caller") ? 0 : 10)
+    + (requirement.length > 35 ? 10 : 0)
+    + Math.min(14, (record.transcript || []).length * 2));
+
+  return { name, place, phone, email, requirement, source: "Voice", score, status };
+}
+
+function summarizeCall(record) {
+  const requirement = firstCustomerRequirement(record);
+  if (requirement.length <= 120) return requirement;
+  return `${requirement.slice(0, 117)}...`;
+}
+
+function recordToConversation(record) {
+  const transcript = (record.transcript || []).map(normalizeTranscriptEntry).filter((entry) => entry.text.trim());
+  const lead = extractLeadDetails(record);
+  const workflowStatus = getWorkflowStatus(record);
+  return {
+    id: record.id,
+    name: lead.name,
+    company: record.company || lead.place,
+    phone: lead.phone,
+    date: formatDisplayDate(record.startedAt),
+    dateValue: record.startedAt,
+    time: formatRelativeTime(record.startedAt),
+    status: workflowStatus,
+    channel: "Voice",
+    summary: record.summary || summarizeCall(record),
+    transcript: transcript.length
+      ? transcript.map((entry, index) => [entry.speaker, entry.text, formatTranscriptTime(entry.at, index)])
+      : [["AI Agent", "Call started. Waiting for live transcript data from the EC Calling Agent.", "now"]],
+  };
+}
+
+function recordToLead(record) {
+  return {
+    id: record.id,
+    date: formatDisplayDate(record.startedAt),
+    dateValue: record.startedAt,
+    ...extractLeadDetails(record),
+    status: getWorkflowStatus(record),
+  };
+}
+
+function buildMetrics(records) {
+  const currentLive = records.filter((record) => record.status === "connecting" || record.status === "connected").length;
+  const today = records.filter((record) => sameLocalDay(record.startedAt)).length;
+  const lastWeek = records.filter((record) => withinDays(record.startedAt, 7)).length;
+  const lastMonth = records.filter((record) => withinDays(record.startedAt, 30)).length;
+  const droppedByAgent = records.filter((record) => record.status === "error").length;
+  const droppedByCustomer = records.filter((record) => record.status === "ended" && (record.transcript || []).length <= 1).length;
+  return [
+    { label: "Current live calls", value: formatNumber(currentLive), delta: currentLive ? "Active browser sessions" : "No active calls", icon: Activity, tone: "cyan" },
+    { label: "AI calls today", value: formatNumber(today), delta: "Calls from widget tests", icon: PhoneCall, tone: "blue" },
+    { label: "AI calls last week", value: formatNumber(lastWeek), delta: "Rolling 7-day call volume", icon: BarChart3, tone: "green" },
+    { label: "AI calls last month", value: formatNumber(lastMonth), delta: "Rolling 30-day call volume", icon: Gauge, tone: "blue" },
+    { label: "Dropped by AI agent", value: formatNumber(droppedByAgent), delta: "Connection or agent errors", icon: PhoneMissed, tone: "orange" },
+    { label: "Dropped by customer", value: formatNumber(droppedByCustomer), delta: "Ended before transcript", icon: PhoneOff, tone: "red" },
+  ];
+}
+
+function buildCallVolume(records) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - index));
+    const calls = records.filter((record) => sameLocalDay(record.startedAt, date)).length;
+    return {
+      label: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      calls,
+    };
+  });
+}
+
+function buildSvgPath(points, maxValue) {
+  if (!points.length) return "";
+  const width = 920;
+  const top = 44;
+  const bottom = 224;
+  const step = points.length === 1 ? width : width / (points.length - 1);
+  return points.map((point, index) => {
+    const x = Math.round(index * step);
+    const y = Math.round(bottom - (point.calls / maxValue) * (bottom - top));
+    return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+  }).join(" ");
+}
+
+function buildActionQueue(records) {
+  return records
+    .filter((record) => getWorkflowStatus(record) !== "Closed")
+    .map((record) => {
+      const lead = extractLeadDetails(record);
+      const status = getWorkflowStatus(record);
+      const priority = status === "Follow up required" ? "High" : "Medium";
+      return [priority, `${lead.name}: ${lead.requirement}`, `${status} · ${formatRelativeTime(record.startedAt)}`];
+    })
+    .slice(0, 3);
+}
+
+function escapeCsvValue(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadCsv(filename, headers, rows) {
+  const csv = [
+    headers.map(escapeCsvValue).join(","),
+    ...rows.map((row) => row.map(escapeCsvValue).join(",")),
+  ].join("\n");
+  downloadFile(filename, csv, "text/csv;charset=utf-8");
+}
+
+function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadExcelTable(filename, sheetTitle, headers, rows) {
+  const tableRows = rows.map((row) => (
+    `<tr>${row.map((value) => `<td>${String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</td>`).join("")}</tr>`
+  )).join("");
+  const headerRows = headers.map((header) => `<th>${header}</th>`).join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body><h1>${sheetTitle}</h1><table><thead><tr>${headerRows}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+  downloadFile(filename, html, "application/vnd.ms-excel;charset=utf-8");
+}
+
+function buildReportFilename(prefix, fromDate, toDate, extension) {
+  const range = `${fromDate || "start"}-${toDate || "today"}`;
+  return `${prefix}-${range}.${extension}`;
+}
+
+function callDropSummary(records) {
+  const total = records.length;
+  const droppedByAgent = records.filter((record) => record.status === "error").length;
+  const attended = records.filter((record) => record.status === "ended" && (record.transcript || []).length > 1).length;
+  return {
+    total,
+    droppedByAgent,
+    droppedByAgentPct: total ? `${Math.round((droppedByAgent / total) * 100)}%` : "0%",
+    attended,
+    attendedPct: total ? `${Math.round((attended / total) * 100)}%` : "0%",
+  };
+}
+
+function dailyCallRows(records, fromDate, toDate) {
+  const filtered = filterByDateRange(records, fromDate, toDate);
+  const summary = callDropSummary(filtered);
+  const grouped = filtered.reduce((acc, record) => {
+    const key = toDateInputValue(record.startedAt);
+    acc[key] ||= { date: key, total: 0, live: 0, attended: 0, droppedByAgent: 0, droppedByCustomer: 0 };
+    acc[key].total += 1;
+    if (record.status === "connecting" || record.status === "connected") acc[key].live += 1;
+    if (record.status === "ended" && (record.transcript || []).length > 1) acc[key].attended += 1;
+    if (record.status === "error") acc[key].droppedByAgent += 1;
+    if (record.status === "ended" && (record.transcript || []).length <= 1) acc[key].droppedByCustomer += 1;
+    return acc;
+  }, {});
+  return {
+    summary,
+    rows: Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
+
+function applyCallEvent(records, event) {
+  if (!event?.sessionId) return records;
+  const existing = records.find((record) => record.id === event.sessionId);
+  const base = existing || {
+    id: event.sessionId,
+    startedAt: event.startedAt || nowIso(),
+    endedAt: null,
+    status: "connecting",
+    channel: "Voice",
+    source: "Phone widget",
+    agentJoined: false,
+    workflowStatus: "Open",
+    transcript: [],
+    summary: "Live EC Calling Agent call in progress.",
+  };
+  let updated = { ...base, transcript: [...(base.transcript || [])] };
+
+  if (event.type === "call-created") {
+    updated = { ...updated, status: "connecting", startedAt: event.startedAt || updated.startedAt, endedAt: null };
+  }
+
+  if (event.type === "call-start") {
+    updated = { ...updated, status: "connected", agentJoined: true };
+  }
+
+  if (event.type === "call-end") {
+    updated = { ...updated, status: "ended", endedAt: event.endedAt || nowIso(), summary: summarizeCall(updated) };
+  }
+
+  if (event.type === "call-error") {
+    updated = { ...updated, status: "error", endedAt: event.endedAt || nowIso(), summary: event.message || "EC Calling Agent call failed." };
+  }
+
+  if (event.type === "transcript" && event.text?.trim()) {
+    const nextEntry = {
+      speaker: event.speaker || "Customer",
+      text: event.text.trim(),
+      at: event.at || nowIso(),
+      final: event.final !== false,
+      partial: Boolean(event.partial),
+    };
+    const lastEntry = updated.transcript[updated.transcript.length - 1];
+    const shouldReplacePartial = lastEntry?.partial && lastEntry.speaker === nextEntry.speaker;
+    const isDuplicate = lastEntry?.speaker === nextEntry.speaker && lastEntry?.text === nextEntry.text;
+    if (shouldReplacePartial) {
+      updated.transcript = [...updated.transcript.slice(0, -1), nextEntry];
+    } else if (!isDuplicate) {
+      updated.transcript = [...updated.transcript, nextEntry];
+    }
+    updated.summary = summarizeCall(updated);
+    updated.lead = extractLeadDetails(updated);
+  }
+
+  const nextRecords = [updated, ...records.filter((record) => record.id !== event.sessionId)];
+  return nextRecords.slice(0, MAX_CALL_RECORDS);
+}
+
+function extractTranscriptFromVapiMessage(message) {
+  const type = String(message?.type || message?.message?.type || "").toLowerCase();
+  const role = String(message?.role || message?.message?.role || message?.speaker || "").toLowerCase();
+  const transcriptType = String(message?.transcriptType || message?.message?.transcriptType || "").toLowerCase();
+  const text = message?.transcript || message?.text || message?.message?.content || message?.content;
+  if (!text || (!type.includes("transcript") && !role)) return null;
+  const speaker = role.includes("assistant") || role.includes("bot") || role.includes("agent") ? "AI Agent" : "Customer";
+  return {
+    speaker,
+    text: String(text),
+    final: transcriptType !== "partial",
+    partial: transcriptType === "partial",
+  };
+}
 
 function App() {
   const [activePage, setActivePage] = useState("overview");
-  const [selectedConversation, setSelectedConversation] = useState(conversations[0]);
+  const [callRecords, setCallRecords] = useState(loadCallRecords);
+  const [selectedConversationId, setSelectedConversationId] = useState(() => callRecords[0]?.id || "");
   const [callPanelOpen, setCallPanelOpen] = useState(false);
-  const call = useVapiCall();
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [notificationCount, setNotificationCount] = useState(0);
+  const uaeClock = useUaeClock();
+  const call = useVapiCall((event) => {
+    setCallRecords((currentRecords) => applyCallEvent(currentRecords, event));
+    if (event?.sessionId) setSelectedConversationId(event.sessionId);
+    if (event?.type === "call-created") setNotificationCount((count) => count + 1);
+  });
+  const liveMetrics = useMemo(() => buildMetrics(callRecords), [callRecords]);
+  const actionQueue = useMemo(() => buildActionQueue(callRecords), [callRecords]);
+  const filteredActionQueue = useMemo(() => (
+    actionQueue.filter(([priority, title, meta]) => matchesQuery([priority, title, meta], globalSearch))
+  ), [actionQueue, globalSearch]);
+  const callVolume = useMemo(() => buildCallVolume(callRecords), [callRecords]);
+  const visibleRecords = useMemo(() => callRecords.slice(0, MAX_VISIBLE_CALLS), [callRecords]);
+  const liveConversations = useMemo(() => visibleRecords.map(recordToConversation), [visibleRecords]);
+  const liveLeads = useMemo(() => visibleRecords.map(recordToLead), [visibleRecords]);
+  const reportConversations = useMemo(() => callRecords.map(recordToConversation), [callRecords]);
+  const reportLeads = useMemo(() => callRecords.map(recordToLead), [callRecords]);
+  const selectedConversation = liveConversations.find((item) => item.id === selectedConversationId) || liveConversations[0];
+  const navItems = useMemo(() => NAV_ITEMS.map((item) => {
+    if (item.id === "conversations") return { ...item, count: liveConversations.length };
+    if (item.id === "leads") return { ...item, count: liveLeads.length };
+    return item;
+  }), [liveConversations.length, liveLeads.length]);
+
+  function updateWorkflowStatus(recordId, workflowStatus) {
+    setCallRecords((currentRecords) => currentRecords.map((record) => (
+      record.id === recordId ? { ...record, workflowStatus } : record
+    )));
+  }
+
+  useEffect(() => {
+    window.localStorage.setItem(CALL_HISTORY_KEY, JSON.stringify(callRecords));
+  }, [callRecords]);
 
   return (
     <div className={`app-shell page-${activePage}`}>
-      <Sidebar activePage={activePage} setActivePage={setActivePage} />
+      <Sidebar activePage={activePage} setActivePage={setActivePage} navItems={navItems} />
       <div className="main-shell">
-        <Topbar activePage={activePage} setActivePage={setActivePage} openCall={() => setCallPanelOpen(true)} />
+        <Topbar
+          activePage={activePage}
+          setActivePage={setActivePage}
+          openCall={() => setCallPanelOpen(true)}
+          navItems={navItems}
+          globalSearch={globalSearch}
+          setGlobalSearch={setGlobalSearch}
+          notificationCount={notificationCount}
+          clearNotifications={() => setNotificationCount(0)}
+        />
         <main className="page-canvas">
-          {activePage === "overview" && <OverviewPage openCall={() => setCallPanelOpen(true)} />}
+          {activePage === "overview" && <OverviewPage metrics={liveMetrics} actionQueue={filteredActionQueue} callVolume={callVolume} uaeClock={uaeClock} callRecords={callRecords} />}
           {activePage === "conversations" && (
             <ConversationsPage
+              conversations={liveConversations}
+              reportConversations={reportConversations}
               selectedConversation={selectedConversation}
-              setSelectedConversation={setSelectedConversation}
+              setSelectedConversationId={setSelectedConversationId}
+              updateWorkflowStatus={updateWorkflowStatus}
+              globalSearch={globalSearch}
             />
           )}
-          {activePage === "leads" && <LeadsPage />}
-          {activePage === "test" && <TestCallPage call={call} />}
+          {activePage === "leads" && <LeadsPage leads={liveLeads} reportLeads={reportLeads} updateWorkflowStatus={updateWorkflowStatus} globalSearch={globalSearch} />}
+          {activePage === "test" && <TestCallPage call={call} callRecords={callRecords} />}
         </main>
       </div>
       <FloatingCallWidget isOpen={callPanelOpen} setIsOpen={setCallPanelOpen} call={call} />
@@ -164,7 +572,7 @@ function App() {
   );
 }
 
-function useVapiCall() {
+function useVapiCall(onCallEvent) {
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("Ready for EC Calling Agent test.");
   const [participantCount, setParticipantCount] = useState(0);
@@ -172,12 +580,22 @@ function useVapiCall() {
   const [dispatchAccepted, setDispatchAccepted] = useState(false);
   const vapiRef = useRef(null);
   const audioRef = useRef(null);
+  const activeCallIdRef = useRef(null);
+  const onCallEventRef = useRef(onCallEvent);
+
+  useEffect(() => {
+    onCallEventRef.current = onCallEvent;
+  }, [onCallEvent]);
 
   useEffect(() => {
     return () => {
       vapiRef.current?.stop?.();
     };
   }, []);
+
+  function emitCallEvent(event) {
+    onCallEventRef.current?.(event);
+  }
 
   function getErrorMessage(error) {
     if (!error) return "Could not start the EC Calling Agent call.";
@@ -199,6 +617,7 @@ function useVapiCall() {
       setDispatchAccepted(true);
       setParticipantCount(2);
       setMessage("EC Calling Agent is live. Speak now.");
+      emitCallEvent({ type: "call-start", sessionId: activeCallIdRef.current, startedAt: nowIso() });
     });
 
     vapi.on("call-end", () => {
@@ -207,6 +626,8 @@ function useVapiCall() {
       setDispatchAccepted(false);
       setParticipantCount(0);
       setMessage("Call disconnected. Ready for another test.");
+      emitCallEvent({ type: "call-end", sessionId: activeCallIdRef.current, endedAt: nowIso() });
+      activeCallIdRef.current = null;
     });
 
     vapi.on("speech-start", () => {
@@ -229,14 +650,33 @@ function useVapiCall() {
       setDispatchAccepted(false);
       setParticipantCount(0);
       setMessage(event?.error || "The EC Calling Agent call could not start.");
+      emitCallEvent({
+        type: "call-error",
+        sessionId: activeCallIdRef.current,
+        endedAt: nowIso(),
+        message: event?.error || "The EC Calling Agent call could not start.",
+      });
     });
 
     vapi.on("error", (error) => {
+      const errorMessage = getErrorMessage(error);
       setStatus("error");
       setAgentJoined(false);
       setDispatchAccepted(false);
       setParticipantCount(0);
-      setMessage(getErrorMessage(error));
+      setMessage(errorMessage);
+      emitCallEvent({ type: "call-error", sessionId: activeCallIdRef.current, endedAt: nowIso(), message: errorMessage });
+    });
+
+    vapi.on("message", (event) => {
+      const transcript = extractTranscriptFromVapiMessage(event);
+      if (!transcript || !activeCallIdRef.current) return;
+      emitCallEvent({
+        type: "transcript",
+        sessionId: activeCallIdRef.current,
+        at: nowIso(),
+        ...transcript,
+      });
     });
 
     vapiRef.current = vapi;
@@ -245,11 +685,14 @@ function useVapiCall() {
 
   async function startCall() {
     if (status === "connecting" || status === "connected") return;
+    const sessionId = `ec-${Date.now()}`;
+    activeCallIdRef.current = sessionId;
     setStatus("connecting");
     setMessage("Requesting microphone access...");
     setAgentJoined(false);
     setDispatchAccepted(false);
     setParticipantCount(0);
+    emitCallEvent({ type: "call-created", sessionId, startedAt: nowIso() });
 
     try {
       const vapi = await getVapiClient();
@@ -261,22 +704,26 @@ function useVapiCall() {
       setDispatchAccepted(false);
       setParticipantCount(0);
       setMessage(getErrorMessage(error));
+      emitCallEvent({ type: "call-error", sessionId, endedAt: nowIso(), message: getErrorMessage(error) });
     }
   }
 
   function endCall() {
+    const sessionId = activeCallIdRef.current;
     vapiRef.current?.stop?.();
     setStatus("idle");
     setMessage("Call disconnected. Ready for another test.");
     setParticipantCount(0);
     setAgentJoined(false);
     setDispatchAccepted(false);
+    emitCallEvent({ type: "call-end", sessionId, endedAt: nowIso() });
+    activeCallIdRef.current = null;
   }
 
   return { status, message, roomName: "", participantCount, agentJoined, dispatchAccepted, startCall, endCall, audioRef };
 }
 
-function Sidebar({ activePage, setActivePage }) {
+function Sidebar({ activePage, setActivePage, navItems }) {
   return (
     <aside className="sidebar">
       <div className="brand-block">
@@ -286,7 +733,7 @@ function Sidebar({ activePage, setActivePage }) {
         </button>
       </div>
       <nav className="side-nav" aria-label="Dashboard sections">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           return (
             <button
@@ -300,7 +747,7 @@ function Sidebar({ activePage, setActivePage }) {
                 <strong>{item.label}</strong>
                 <small>{item.hint}</small>
               </span>
-              {item.count && <em>{item.count}</em>}
+              {typeof item.count === "number" && item.count > 0 && <em>{item.count}</em>}
             </button>
           );
         })}
@@ -316,13 +763,13 @@ function Sidebar({ activePage, setActivePage }) {
   );
 }
 
-function Topbar({ activePage, setActivePage, openCall }) {
+function Topbar({ activePage, setActivePage, openCall, navItems, globalSearch, setGlobalSearch, notificationCount, clearNotifications }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const titles = {
-    overview: ["Home Page", "Voice agent analytics at a glance"],
+    overview: ["Voice Agent Analytics at a glance", ""],
     conversations: ["Conversation", "Past calls and transcript review"],
     leads: ["Lead Management", "Client information captured by the AI agent"],
-    test: ["Test Call", "Live EC Calling Agent quality check"],
+    test: ["Diagnostics", "Live EC Calling Agent quality check"],
   };
   const [title, subtitle] = titles[activePage];
 
@@ -339,7 +786,7 @@ function Topbar({ activePage, setActivePage, openCall }) {
       </div>
       <div className="topbar-title">
         <h1>{title}</h1>
-        <p>{subtitle}</p>
+        {subtitle && <p>{subtitle}</p>}
       </div>
       <div className="mobile-topbar-controls">
         <button
@@ -366,7 +813,7 @@ function Topbar({ activePage, setActivePage, openCall }) {
           </button>
           {menuOpen && (
             <nav id="mobile-dashboard-menu" className="mobile-menu-panel" aria-label="Mobile dashboard sections">
-              {NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <button
@@ -377,6 +824,7 @@ function Topbar({ activePage, setActivePage, openCall }) {
                   >
                     <Icon size={18} />
                     <span>{item.label}</span>
+                    {typeof item.count === "number" && item.count > 0 && <em>{item.count}</em>}
                   </button>
                 );
               })}
@@ -387,18 +835,60 @@ function Topbar({ activePage, setActivePage, openCall }) {
       <div className="topbar-actions">
         <label className="search-box">
           <Search size={18} />
-          <input placeholder="Search leads, calls, transcripts" />
+          <input aria-label="Search live records" value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} />
         </label>
         <span className="status-pill"><span /> AI Live</span>
         <span className="latency-pill"><Zap size={15} /> 308ms</span>
-        <button type="button" aria-label="Notifications"><Bell size={18} /></button>
+        <button
+          type="button"
+          className={notificationCount ? "notification-button has-alert" : "notification-button"}
+          aria-label={notificationCount ? `${notificationCount} new call notification` : "No new notifications"}
+          onClick={clearNotifications}
+        >
+          <Bell size={18} />
+          {notificationCount > 0 && <em>{notificationCount}</em>}
+        </button>
         <span className="avatar top">EC</span>
       </div>
     </header>
   );
 }
 
-function OverviewPage() {
+function OverviewPage({ metrics: dashboardMetrics, actionQueue, callVolume, uaeClock, callRecords }) {
+  const [reportFromDate, setReportFromDate] = useState("");
+  const [reportToDate, setReportToDate] = useState("");
+
+  function downloadDashboardReport() {
+    const { summary, rows } = dailyCallRows(callRecords, reportFromDate, reportToDate);
+    const reportRows = rows.map((row) => [
+      row.date,
+      row.total,
+      row.live,
+      row.attended,
+      row.droppedByAgent,
+      row.droppedByCustomer,
+      "",
+      "",
+      "",
+    ]);
+    reportRows.push([
+      "Period summary",
+      "",
+      "",
+      summary.attended,
+      summary.droppedByAgent,
+      "",
+      summary.total,
+      summary.droppedByAgentPct,
+      summary.attendedPct,
+    ]);
+    downloadCsv(
+      buildReportFilename("ethikcorp-call-analytics", reportFromDate, reportToDate, "csv"),
+      ["Date", "Total calls", "Live calls", "Calls attended", "Dropped by agent", "Dropped by customer", "Period total", "Dropped by agent %", "Calls attended %"],
+      reportRows,
+    );
+  }
+
   return (
     <section className="dashboard-page">
       <div className="mobile-overview-heading">
@@ -406,14 +896,14 @@ function OverviewPage() {
       </div>
       <div className="report-row">
         <p>Reporting window <strong>July 2026</strong> · UAE time zone</p>
-        <div className="period-toggle">
-          {["Today", "Week", "Month", "Quarter", "Year"].map((item, index) => (
-            <button className={index === 0 ? "active" : ""} type="button" key={item}>{item}</button>
-          ))}
+        <div className="uae-clock" aria-label="Current UAE time">
+          <span>UAE Time</span>
+          <strong>{uaeClock.time}</strong>
+          <small>{uaeClock.date}</small>
         </div>
       </div>
       <div className="metric-grid">
-        {metrics.map((metric) => {
+        {dashboardMetrics.map((metric) => {
           const Icon = metric.icon;
           return (
             <article className={`metric-card ${metric.tone}`} key={metric.label}>
@@ -430,15 +920,11 @@ function OverviewPage() {
       <div className="overview-grid">
         <article className="panel large">
           <PanelTitle title="Call Volume" subtitle="Inbound AI agent calls over time" />
-          <LineChart />
+          <LineChart data={callVolume} />
         </article>
         <article className="panel action-queue">
           <PanelTitle title="Action Queue" subtitle="Items needing human follow-up" />
-          {[
-            ["High", "Retail transformation proposal requested", "Transformation · due 21m"],
-            ["High", "Training quote for 40 managers", "Corporate Training · due 43m"],
-            ["Medium", "Hospitality guest journey callback", "Hospitality · due 1h"],
-          ].map(([priority, title, meta]) => (
+          {(actionQueue.length ? actionQueue : [["Medium", "No follow-up required", "Calls are up to date"]]).map(([priority, title, meta]) => (
             <div className="queue-item" key={title}>
               <span className={priority.toLowerCase()} />
               <div><strong>{title}</strong><small>{meta}</small></div>
@@ -447,6 +933,16 @@ function OverviewPage() {
           ))}
         </article>
       </div>
+      <ReportDownloadBar
+        title="Download call analytics report"
+        description="Daily live calls, attendance, agent drops, and period summary."
+        fromDate={reportFromDate}
+        setFromDate={setReportFromDate}
+        toDate={reportToDate}
+        setToDate={setReportToDate}
+        buttonLabel="Download Report"
+        onDownload={downloadDashboardReport}
+      />
     </section>
   );
 }
@@ -460,22 +956,22 @@ function PanelTitle({ title, subtitle }) {
   );
 }
 
-function LineChart() {
-  const series = [
-    "M 0 170 C 110 120, 170 190, 260 130 S 420 110, 500 138 S 650 98, 760 140 S 860 105, 920 55",
-    "M 0 205 C 130 188, 190 208, 280 181 S 430 170, 530 184 S 660 160, 760 190 S 850 178, 920 154",
-    "M 0 228 C 140 210, 190 236, 285 214 S 455 206, 535 218 S 670 194, 775 220 S 850 214, 920 199",
-  ];
+function LineChart({ data }) {
+  const maxValue = Math.max(1, ...data.map((point) => point.calls));
+  const livePath = buildSvgPath(data, maxValue);
   return (
     <div className="chart-wrap" aria-label="Call volume chart">
       <svg viewBox="0 0 960 270" role="img">
         {[0, 1, 2, 3].map((n) => <line key={n} x1="0" x2="960" y1={55 + n * 58} y2={55 + n * 58} />)}
-        <path className="area" d={`${series[0]} L 920 270 L 0 270 Z`} />
-        <path className="orange-line" d={series[0]} />
-        <path className="blue-line" d={series[1]} />
-        <path className="cyan-line" d={series[2]} />
+        <path className="area" d={`${livePath} L 920 270 L 0 270 Z`} />
+        <path className="cyan-line" d={livePath} />
+        {data.map((point, index) => {
+          const x = data.length === 1 ? 0 : Math.round(index * (920 / (data.length - 1)));
+          const y = Math.round(224 - (point.calls / maxValue) * 180);
+          return <circle key={point.label} cx={x} cy={y} r="5" />;
+        })}
       </svg>
-      <div className="chart-days">{["Jun 28", "Jun 29", "Jun 30", "Jul 1", "Jul 2", "Jul 3", "Jul 4"].map((d) => <span key={d}>{d}</span>)}</div>
+      <div className="chart-days">{data.map((point) => <span key={point.label}>{point.label}</span>)}</div>
     </div>
   );
 }
@@ -521,79 +1017,416 @@ function BarMix() {
   );
 }
 
-function ConversationsPage({ selectedConversation, setSelectedConversation }) {
+function formatDateControlLabel(value) {
+  if (!value) return "Any date";
+  return new Date(`${value}T12:00:00`).toLocaleDateString("en-AE", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function monthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function buildCalendarDays(monthDate) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const start = new Date(firstDay);
+  start.setDate(firstDay.getDate() - firstDay.getDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+}
+
+function DateInputBox({ label, value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => (value ? new Date(`${value}T12:00:00`) : new Date()));
+  const days = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
+  const selectedMonth = monthKey(visibleMonth);
+
+  function selectDate(date) {
+    onChange(toLocalDateInputValue(date));
+    setVisibleMonth(date);
+    setIsOpen(false);
+  }
+
+  function shiftMonth(offset) {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+  }
+
+  return (
+    <div className={isOpen ? "modern-date-field open" : "modern-date-field"}>
+      <span>{label}</span>
+      <button type="button" className="date-trigger" aria-expanded={isOpen} onClick={() => setIsOpen((open) => !open)}>
+        <CalendarDays size={16} />
+        <em>{formatDateControlLabel(value)}</em>
+      </button>
+      {isOpen && (
+        <div className="mini-calendar" role="dialog" aria-label={`${label} calendar`}>
+          <header>
+            <button type="button" aria-label="Previous month" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
+            <strong>{visibleMonth.toLocaleDateString("en-AE", { month: "long", year: "numeric" })}</strong>
+            <button type="button" aria-label="Next month" onClick={() => shiftMonth(1)}><ChevronRight size={16} /></button>
+          </header>
+          <div className="calendar-weekdays">
+            {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}
+          </div>
+          <div className="calendar-days">
+            {days.map((date) => {
+              const dateValue = toLocalDateInputValue(date);
+              return (
+                <button
+                  type="button"
+                  key={dateValue}
+                  className={[
+                    monthKey(date) !== selectedMonth ? "muted" : "",
+                    value === dateValue ? "selected" : "",
+                  ].filter(Boolean).join(" ")}
+                  onClick={() => selectDate(date)}
+                >
+                  {date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReportDownloadBar({ title, description, fromDate, setFromDate, toDate, setToDate, buttonLabel, onDownload, showDates = true }) {
+  return (
+    <div className={showDates ? "download-report-bar with-dates" : "download-report-bar button-only"}>
+      <div>
+        <FileText size={18} />
+        <span>
+          <strong>{title}</strong>
+          <small>{description}</small>
+        </span>
+      </div>
+      {showDates && (
+        <>
+          <DateInputBox label="Start date" value={fromDate} onChange={setFromDate} />
+          <DateInputBox label="End date" value={toDate} onChange={setToDate} />
+        </>
+      )}
+      <button type="button" onClick={onDownload}>
+        <Download size={17} />
+        {buttonLabel}
+      </button>
+    </div>
+  );
+}
+
+function DateStatusFilters({ fromDate, setFromDate, toDate, setToDate, statusFilter, setStatusFilter }) {
+  return (
+    <div className="data-filter-row">
+      <DateInputBox label="Start date" value={fromDate} onChange={setFromDate} />
+      <DateInputBox label="End date" value={toDate} onChange={setToDate} />
+      <StatusDropdown
+        label="Status"
+        value={statusFilter}
+        options={["All", ...WORKFLOW_STATUSES]}
+        onChange={setStatusFilter}
+      />
+    </div>
+  );
+}
+
+function StatusFilter({ statusFilter, setStatusFilter }) {
+  return (
+    <div className="status-filter-row">
+      <StatusDropdown
+        label="Status"
+        value={statusFilter}
+        options={["All", ...WORKFLOW_STATUSES]}
+        onChange={setStatusFilter}
+      />
+    </div>
+  );
+}
+
+function WorkflowStatusSelect({ value, onChange, label = "Status", showLabel = true }) {
+  return (
+    <StatusDropdown
+      label={label}
+      value={value}
+      options={WORKFLOW_STATUSES}
+      onChange={onChange}
+      showLabel={showLabel}
+      className={`workflow-select ${workflowStatusClass(value)} ${showLabel ? "" : "compact"}`}
+    />
+  );
+}
+
+function StatusDropdown({ label, value, options, onChange, showLabel = true, className = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className={`status-dropdown ${className} ${isOpen ? "open-menu" : ""}`}>
+      {showLabel && <span>{label}</span>}
+      <button type="button" aria-expanded={isOpen} onClick={() => setIsOpen((open) => !open)}>
+        <strong>{value}</strong>
+        <ChevronDown size={15} />
+      </button>
+      {isOpen && (
+        <div className="status-menu" role="listbox" aria-label={label}>
+          {options.map((option) => (
+            <button
+              type="button"
+              role="option"
+              aria-selected={option === value}
+              key={option}
+              className={option === value ? "selected" : ""}
+              onClick={() => {
+                onChange(option);
+                setIsOpen(false);
+              }}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConversationsPage({ conversations, reportConversations, selectedConversation, setSelectedConversationId, updateWorkflowStatus, globalSearch }) {
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [noteDraft, setNoteDraft] = useState("");
+  const filteredConversations = useMemo(() => sortByDate(
+    conversations.filter((item) => (
+      withinDateFilter(item.dateValue, fromDate, toDate)
+      && (statusFilter === "All" || item.status === statusFilter)
+      && matchesQuery([
+        item.name,
+        item.company,
+        item.phone,
+        item.date,
+        item.status,
+        item.summary,
+        ...item.transcript.flatMap(([speaker, text]) => [speaker, text]),
+      ], globalSearch)
+    )),
+    sortDirection,
+  ), [conversations, fromDate, toDate, statusFilter, sortDirection, globalSearch]);
+  const activeConversation = selectedConversation && filteredConversations.some((item) => item.id === selectedConversation.id)
+    ? selectedConversation
+    : filteredConversations[0];
+
+  useEffect(() => {
+    setNoteDraft("");
+  }, [activeConversation?.id]);
+
+  function downloadConversationReport() {
+    const rows = filterByDateRange(reportConversations, fromDate, toDate).map((item) => [
+      item.date,
+      item.name,
+      item.phone,
+      item.company,
+      item.status,
+      item.summary,
+      item.transcript.map(([speaker, text, time]) => `${time} ${speaker}: ${text}`).join(" | "),
+    ]);
+    downloadCsv(
+      buildReportFilename("ethikcorp-conversations", fromDate, toDate, "csv"),
+      ["Date", "Customer", "Phone", "Place", "Status", "Summary", "Transcript"],
+      rows,
+    );
+  }
+
   return (
     <section className="conversation-layout">
       <aside className="conversation-list">
-        <div className="filter-row">
-          {["All", "Voice", "Qualified"].map((label, index) => <button className={index === 0 ? "active" : ""} type="button" key={label}>{label}</button>)}
+        <DateStatusFilters
+          fromDate={fromDate}
+          setFromDate={setFromDate}
+          toDate={toDate}
+          setToDate={setToDate}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+        />
+        <div className="conversation-report-action">
+          <button type="button" onClick={downloadConversationReport}>
+            <Download size={17} />
+            Download Report
+          </button>
         </div>
-        <div className="mini-stats"><span><strong>18</strong> Open</span><span><strong>7</strong> Unread</span></div>
-        {conversations.map((item) => (
+        {!!filteredConversations.length && (
+          <div className="conversation-list-head">
+            <span>Customer</span>
+            <button type="button" className="table-sort" onClick={() => setSortDirection((direction) => (direction === "desc" ? "asc" : "desc"))}>
+              Date {sortDirection === "desc" ? "↓" : "↑"}
+            </button>
+            <span>Status</span>
+          </div>
+        )}
+        {!filteredConversations.length && (
+          <div className="empty-state compact">
+            <strong>No live call data yet</strong>
+            <p>New calls made from the phone widget will appear here when they match the filters.</p>
+          </div>
+        )}
+        {filteredConversations.map((item) => (
           <button
             type="button"
-            className={selectedConversation.id === item.id ? "conversation-card active" : "conversation-card"}
+            className={activeConversation?.id === item.id ? "conversation-card active" : "conversation-card"}
             key={item.id}
-            onClick={() => setSelectedConversation(item)}
+            onClick={() => setSelectedConversationId(item.id)}
           >
             <span><strong>{item.name}</strong><em>{item.time}</em></span>
-            <small>{item.channel} · {item.status}</small>
+            <b>{item.date}</b>
+            <small>{item.status}</small>
             <p>{item.summary}</p>
           </button>
         ))}
       </aside>
       <article className="transcript-panel">
-        <header>
-          <div>
-            <h2>{selectedConversation.name} - Customer Journey</h2>
-            <p>{selectedConversation.company} · {selectedConversation.phone}</p>
-          </div>
-          <div><button type="button">Assign</button><button type="button">Mark Resolved</button></div>
-        </header>
-        <div className="transcript-stream">
-          {selectedConversation.transcript.map(([speaker, text], index) => (
-            <div className="transcript-line" key={`${speaker}-${index}`}>
-              <span className={speaker === "AI Agent" ? "ai" : "customer"}>{speaker === "AI Agent" ? <Bot size={18} /> : <UserRound size={18} />}</span>
+        {activeConversation ? (
+          <>
+            <header>
               <div>
-                <strong>{speaker}<em>{index + 1} min</em></strong>
-                <p>{text}</p>
+                <h2>{activeConversation.name} - Customer Journey</h2>
+                <p>{activeConversation.company} · {activeConversation.phone} · {activeConversation.date}</p>
               </div>
+              <WorkflowStatusSelect
+                value={activeConversation.status}
+                onChange={(status) => updateWorkflowStatus(activeConversation.id, status)}
+              />
+            </header>
+            <div className="transcript-stream">
+              {activeConversation.transcript.map(([speaker, text, time], index) => (
+                <div className="transcript-line" key={`${speaker}-${index}`}>
+                  <span className={speaker === "AI Agent" ? "ai" : "customer"}>{speaker === "AI Agent" ? <Bot size={18} /> : <UserRound size={18} />}</span>
+                  <div>
+                    <strong>{speaker}<em>{time || `${index + 1} min`}</em></strong>
+                    <p>{text}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <footer className="reply-bar">
-          <input placeholder="Internal note or follow-up message..." />
-          <button type="button">Save Note</button>
-        </footer>
+            <footer className="reply-bar">
+              <input
+                placeholder="Internal note or follow-up message..."
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+              />
+              <button type="button" disabled={!noteDraft.trim()} onClick={() => setNoteDraft("")}>Save Note</button>
+            </footer>
+          </>
+        ) : (
+          <div className="empty-state transcript-empty">
+            <strong>No transcript selected</strong>
+            <p>Start a call from the phone widget. The latest transcript will show here automatically.</p>
+          </div>
+        )}
       </article>
     </section>
   );
 }
 
-function LeadsPage() {
-  const [selectedLead, setSelectedLead] = useState(leads[0]);
+function LeadsPage({ leads, reportLeads, updateWorkflowStatus, globalSearch }) {
+  const [selectedLeadId, setSelectedLeadId] = useState(leads[0]?.id || "");
+  const [leadSearch, setLeadSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const combinedSearch = [globalSearch, leadSearch].filter(Boolean).join(" ");
+  const filteredLeads = useMemo(() => sortByDate(
+    leads.filter((lead) => (
+      statusFilter === "All" || lead.status === statusFilter
+    )).filter((lead) => (
+      withinDateFilter(lead.dateValue, fromDate, toDate)
+    )).filter((lead) => (
+      matchesQuery([
+        lead.name,
+        lead.place,
+        lead.phone,
+        lead.email,
+        lead.requirement,
+        lead.status,
+        lead.date,
+      ], combinedSearch)
+    )),
+    sortDirection,
+  ), [leads, statusFilter, fromDate, toDate, sortDirection, combinedSearch]);
+  const selectedLead = leads.find((lead) => lead.id === selectedLeadId) || leads[0];
+  const openCount = leads.filter((lead) => lead.status === "Open").length;
+  const followUpCount = leads.filter((lead) => lead.status === "Follow up required").length;
+  const closedCount = leads.filter((lead) => lead.status === "Closed").length;
+
+  useEffect(() => {
+    if (!leads.some((lead) => lead.id === selectedLeadId)) {
+      setSelectedLeadId(leads[0]?.id || "");
+    }
+  }, [leads, selectedLeadId]);
+
+  function downloadLeadReport() {
+    const rows = filterByDateRange(reportLeads, fromDate, toDate).filter((lead) => (
+      statusFilter === "All" || lead.status === statusFilter
+    )).map((lead) => [
+      lead.date,
+      lead.name,
+      lead.place,
+      lead.phone,
+      lead.email,
+      lead.requirement,
+      lead.status,
+      lead.score,
+    ]);
+    downloadExcelTable(
+      buildReportFilename("ethikcorp-leads", fromDate, toDate, "xls"),
+      "EthikCorp Leads Captured",
+      ["Date", "Name", "Place", "Calling Number", "Email", "Customer Requirement", "Status", "Score"],
+      rows,
+    );
+  }
 
   return (
     <section className="leads-page">
       <div className="lead-toolbar">
-        <label className="lead-search"><Search size={17} /><input placeholder="Search by name, place, phone, email, requirement" /></label>
-        {["All Status", "New", "Qualified", "Training", "Callback"].map((item, index) => <button className={index === 0 ? "active" : ""} type="button" key={item}>{item}</button>)}
-        <button type="button" className="add-lead"><Plus size={17} /> Add Lead</button>
+        <label className="lead-search"><Search size={17} /><input aria-label="Search leads" value={leadSearch} onChange={(event) => setLeadSearch(event.target.value)} /></label>
+        <StatusFilter
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+        />
+        <DateInputBox label="Start date" value={fromDate} onChange={setFromDate} />
+        <DateInputBox label="End date" value={toDate} onChange={setToDate} />
+        <button type="button" className="download-inline-button" onClick={downloadLeadReport}>
+          <Download size={17} />
+          Download Report
+        </button>
       </div>
       <div className="lead-summary">
-        <span><strong>12</strong> Total</span>
-        <span><strong>5</strong> Qualified</span>
-        <span><strong>3</strong> Training</span>
-        <span><strong>4</strong> Callback</span>
+        <span><strong>{filteredLeads.length}</strong> Showing</span>
+        <span><strong>{openCount}</strong> Open</span>
+        <span><strong>{followUpCount}</strong> Follow up</span>
+        <span><strong>{closedCount}</strong> Closed</span>
       </div>
       <div className="mobile-lead-workspace">
         <div className="mobile-lead-list" aria-label="Captured leads">
-          {leads.map((lead) => (
+          {!filteredLeads.length && (
+            <div className="empty-state compact">
+              <strong>No live leads yet</strong>
+              <p>Caller details extracted from the latest calls will appear here when they match the filters.</p>
+            </div>
+          )}
+          {filteredLeads.map((lead, index) => (
             <button
               type="button"
-              className={selectedLead.phone === lead.phone ? "mobile-lead-row active" : "mobile-lead-row"}
-              key={lead.phone}
-              onClick={() => setSelectedLead(lead)}
+              className={selectedLead?.id === lead.id ? "mobile-lead-row active" : "mobile-lead-row"}
+              key={lead.id || `${lead.phone}-${index}`}
+              onClick={() => setSelectedLeadId(lead.id)}
             >
               <span>
                 <strong>{lead.name}</strong>
@@ -603,47 +1436,78 @@ function LeadsPage() {
             </button>
           ))}
         </div>
-        <article className="mobile-lead-detail">
-          <header>
-            <strong>{selectedLead.name}</strong>
-            <span className={`lead-status ${selectedLead.status.toLowerCase()}`}>{selectedLead.status}</span>
-          </header>
-          <dl>
-            <div><dt>Place</dt><dd>{selectedLead.place}</dd></div>
-            <div><dt>Calling Number</dt><dd>{selectedLead.phone}</dd></div>
-            <div><dt>Email</dt><dd>{selectedLead.email}</dd></div>
-            <div><dt>Requirement</dt><dd>{selectedLead.requirement}</dd></div>
-            <div><dt>Score</dt><dd>{selectedLead.score}</dd></div>
-          </dl>
-        </article>
+        {selectedLead ? (
+          <article className="mobile-lead-detail">
+            <header>
+              <strong>{selectedLead.name}</strong>
+              <WorkflowStatusSelect
+                value={selectedLead.status}
+                onChange={(status) => updateWorkflowStatus(selectedLead.id, status)}
+                label="Lead status"
+              />
+            </header>
+            <dl>
+              <div><dt>Place</dt><dd>{selectedLead.place}</dd></div>
+              <div><dt>Date</dt><dd>{selectedLead.date}</dd></div>
+              <div><dt>Calling Number</dt><dd>{selectedLead.phone}</dd></div>
+              <div><dt>Email</dt><dd>{selectedLead.email}</dd></div>
+              <div><dt>Requirement</dt><dd>{selectedLead.requirement}</dd></div>
+              <div><dt>Score</dt><dd>{selectedLead.score}</dd></div>
+            </dl>
+          </article>
+        ) : (
+          <article className="mobile-lead-detail empty-state">
+            <strong>No lead selected</strong>
+            <p>Make a live test call to capture the first lead.</p>
+          </article>
+        )}
       </div>
       <div className="table-panel">
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Place</th>
-              <th>Calling Number</th>
-              <th>Email</th>
-              <th>Customer Requirement</th>
-              <th>Status</th>
-              <th>Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leads.map((lead) => (
-              <tr key={lead.phone}>
-                <td><strong>{lead.name}</strong><small>{lead.source}</small></td>
-                <td>{lead.place}</td>
-                <td>{lead.phone}</td>
-                <td>{lead.email}</td>
-                <td>{lead.requirement}</td>
-                <td><span className={`lead-status ${lead.status.toLowerCase()}`}>{lead.status}</span></td>
-                <td><Score value={lead.score} /></td>
+        {filteredLeads.length ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>
+                  <button type="button" className="table-sort" onClick={() => setSortDirection((direction) => (direction === "desc" ? "asc" : "desc"))}>
+                    Date {sortDirection === "desc" ? "↓" : "↑"}
+                  </button>
+                </th>
+                <th>Place</th>
+                <th>Calling Number</th>
+                <th>Email</th>
+                <th>Customer Requirement</th>
+                <th>Status</th>
+                <th>Score</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredLeads.map((lead, index) => (
+                <tr key={lead.id || `${lead.phone}-${index}`}>
+                  <td><strong>{lead.name}</strong><small>{lead.source}</small></td>
+                  <td>{lead.date}</td>
+                  <td>{lead.place}</td>
+                  <td>{lead.phone}</td>
+                  <td>{lead.email}</td>
+                  <td>{lead.requirement}</td>
+                  <td>
+                    <WorkflowStatusSelect
+                      value={lead.status}
+                      onChange={(status) => updateWorkflowStatus(lead.id, status)}
+                      showLabel={false}
+                    />
+                  </td>
+                  <td><Score value={lead.score} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="empty-state table-empty">
+            <strong>No lead records yet</strong>
+            <p>Only live call data is shown. New caller details will be saved here after the phone widget receives calls.</p>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -653,17 +1517,75 @@ function Score({ value }) {
   return <span className="score"><i><b style={{ width: `${value}%` }} /></i><strong>{value}</strong></span>;
 }
 
-function TestCallPage({ call }) {
+function TestCallPage({ call, callRecords }) {
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  function downloadAgentLogs() {
+    const rows = filterByDateRange(callRecords, fromDate, toDate).map((record) => {
+      const lead = extractLeadDetails(record);
+      const transcript = (record.transcript || [])
+        .map(normalizeTranscriptEntry)
+        .map((entry) => `${formatTranscriptTime(entry.at, 0)} ${entry.speaker}: ${entry.text}`)
+        .join(" | ");
+      return [
+        formatDisplayDate(record.startedAt),
+        record.startedAt,
+        record.endedAt || "",
+        record.status,
+        getWorkflowStatus(record),
+        lead.name,
+        lead.phone,
+        record.summary || summarizeCall(record),
+        transcript,
+      ];
+    });
+    downloadCsv(
+      buildReportFilename("ethikcorp-agent-logs", fromDate, toDate, "csv"),
+      ["Date", "Started at", "Ended at", "Call status", "Workflow status", "Customer", "Phone", "Summary", "Transcript log"],
+      rows,
+    );
+  }
+
   return (
     <section className="test-call-page">
-      <article className="panel test-copy">
-        <PanelTitle
-          title="EC Calling Agent Test Console"
-          subtitle="Click the Start Call button to initiate a live call. Your browser will request permission to access the microphone before the call begins."
+      <div className="diagnostics-left">
+        <article className="panel test-copy">
+          <PanelTitle
+            title="Test Console"
+            subtitle="Click the Start Call button to initiate a live call. Your browser will request permission to access the microphone before the call begins."
+          />
+        </article>
+        <AgentLogDownloadBox
+          fromDate={fromDate}
+          setFromDate={setFromDate}
+          toDate={toDate}
+          setToDate={setToDate}
+          onDownload={downloadAgentLogs}
         />
-      </article>
+      </div>
       <PhoneMockup call={call} />
     </section>
+  );
+}
+
+function AgentLogDownloadBox({ fromDate, setFromDate, toDate, setToDate, onDownload }) {
+  return (
+    <article className="agent-log-box">
+      <header>
+        <FileText size={18} />
+        <strong>Download logs</strong>
+      </header>
+      <p>Download agent logs for the below selected dates.</p>
+      <div className="agent-log-dates">
+        <DateInputBox label="Start date" value={fromDate} onChange={setFromDate} />
+        <DateInputBox label="End date" value={toDate} onChange={setToDate} />
+      </div>
+      <button type="button" onClick={onDownload}>
+        <Download size={17} />
+        Download Logs
+      </button>
+    </article>
   );
 }
 
